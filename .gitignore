@@ -173,3 +173,6 @@ data/*
 *.png
 *.json
 */*.DS_Store
+
+#environments
+envs/*
