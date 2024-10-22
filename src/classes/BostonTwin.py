@@ -439,14 +439,15 @@ class BostonTwin:
         return nodes_dict
 
     def generate_scene_from_radius(
-        self,
-        scene_name: str,
-        center_lon: float,
-        center_lat: float,
-        side_m: float,
-        load=False,
-    ):
-        """Generate a new scene specifying its center and radius.
+            self,
+            scene_name: str,
+            center_lon: float,
+            center_lat: float,
+            side_m: float,
+            load=False,
+        ):
+        """
+        Generate a new scene by specifying its center and radius.
 
         Parameters
         ----------
@@ -459,28 +460,44 @@ class BostonTwin:
         side_m : float
             Radius of the scene.
         load : bool, optional
-            Load the scene as current scene. Defaults to False.
+            Load the scene as the current scene. Defaults to False.
         """
-        radius = np.sqrt(2) * side_m  # m
-        azimuths = [45, 225]
+        # Calculate the radius and azimuths (in meters)
+        radius = np.sqrt(2) * side_m  # Diagonal radius for a square coverage area
+        azimuths = [45, 225]  # Diagonal directions
 
+        # Use pyproj to compute the bounding box coordinates
         geod = pyproj.Geod(ellps="WGS84")
         lon1, lat1, _ = geod.fwd(center_lon, center_lat, azimuths[0], radius)
         lon2, lat2, _ = geod.fwd(center_lon, center_lat, azimuths[1], radius)
-        bbox = [lon1, lat1, lon2, lat2]
-        print("Selecting models within the area...")
+
+        # Ensure bbox is a tuple and print its type for debugging
+        bbox = (min(lon1, lon2), min(lat1, lat2), max(lon1, lon2), max(lat1, lat2))
+        print(f"BBox: {bbox}, Type: {type(bbox)}")  # Debugging output
+
+        # Time the loading process for performance tracking
         t0 = time.time()
-        boston_gdf = gpd.GeoDataFrame.from_file(
-            self.boston_model_path.joinpath("boston.geojson"), bbox=bbox
-        )
+        try:
+            # Load GeoDataFrame within the bounding box
+            boston_gdf = gpd.read_file(
+                self.boston_model_path.joinpath("boston.geojson"), bbox=bbox
+            )
+        except Exception as e:
+            print(f"Error loading GeoDataFrame: {e}")
+            return
+
         t1 = time.time()
-        print(f"Done. ({t1-t0:.2f} s)")
+        print(f"Done. Loaded scene in {t1-t0:.2f} seconds.")
+
+        # Generate the scene from the loaded models
         self.boston_model.generate_scene_from_model_gdf(
             boston_gdf, (center_lon, center_lat), scene_name
         )
 
+        # Optionally load the new scene as the current scene
         if load:
             self.set_scene(scene_name)
+
 
     def export_scene_antennas(self, out_path: Union[Path, str]):
         """Export to file the location (in the local CRS) of the antennas in the current scene.
